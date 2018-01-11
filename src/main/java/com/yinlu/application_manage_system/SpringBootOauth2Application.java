@@ -6,6 +6,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.servlet.Filter;
+
+import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -33,6 +35,7 @@ import org.springframework.security.oauth2.config.annotation.web.configuration.E
 import org.springframework.security.oauth2.config.annotation.web.configuration.EnableResourceServer;
 import org.springframework.security.oauth2.config.annotation.web.configuration.ResourceServerConfigurerAdapter;
 import org.springframework.security.oauth2.config.annotation.web.configurers.AuthorizationServerEndpointsConfigurer;
+import org.springframework.security.oauth2.provider.ClientDetailsService;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -40,10 +43,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.filter.CompositeFilter;
 
+import com.yinlu.application_manage_system.service.CustomClientDetailsService;
+
 //@EnableOAuth2Sso
 @SpringBootApplication
 @EnableOAuth2Client
-
+@MapperScan("com.yinlu.application_manage_system.dao")
 @RestController
 @Order(SecurityProperties.ACCESS_OVERRIDE_ORDER)
 public class SpringBootOauth2Application extends WebSecurityConfigurerAdapter {
@@ -58,8 +63,16 @@ public class SpringBootOauth2Application extends WebSecurityConfigurerAdapter {
 	@RequestMapping({ "/user", "/me" })
 	public Map<String, String> user(Principal principal) {
 		Map<String, String> map = new LinkedHashMap<>();
-		map.put("name", principal.getName());
+		map.put("username", principal.getName());
 		return map;
+	}
+	@RequestMapping("/app")
+	public String app(String msg) {
+		return "Hello "+msg+",this is app info api";
+	}
+	@RequestMapping("/file")
+	public String file(String msg) {
+		return "Hello "+msg+",this is fileupload api";
 	}
 
 	@Override
@@ -69,11 +82,10 @@ public class SpringBootOauth2Application extends WebSecurityConfigurerAdapter {
 																					// are explicitly excluded
 				.permitAll().anyRequest() // All other endpoints require an authenticated user
 				.authenticated().and().exceptionHandling()
-				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/")) // Unauthenticated users are
-																						// re-directed to the home page
-				.and().logout().logoutSuccessUrl("/").permitAll().and().csrf()
-				.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()).and()
-				.addFilterBefore(ssoFilter(), BasicAuthenticationFilter.class);
+				.authenticationEntryPoint(new LoginUrlAuthenticationEntryPoint("/")) // Unauthenticated users are re-directed to the home page
+				.and().logout().logoutSuccessUrl("/").permitAll()
+				.and().csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+				.and().addFilterBefore(ssoFilter(), BasicAuthenticationFilter.class);
 	}
 
 	@Bean
@@ -139,13 +151,32 @@ class ClientResources {
 	protected static class ResourceServerConfiguration extends ResourceServerConfigurerAdapter {
 		@Override
 		public void configure(HttpSecurity http) throws Exception {
-			http.antMatcher("/me").authorizeRequests().anyRequest().authenticated();
+			http
+				.antMatcher("/me")
+					.authorizeRequests()
+					.anyRequest()
+					.access("#oauth2.hasScope('read') or #oauth2.hasScope('write')")
+				.and()
+				.antMatcher("/file")
+					.authorizeRequests()
+					.anyRequest()
+					.access("#oauth2.hasScope('file')")
+				.and()
+					.antMatcher("/app")
+					.authorizeRequests()
+					.anyRequest()
+					.access("#oauth2.hasScope('app')");
 		}
 	}
 
 	@Configuration
 	@EnableAuthorizationServer
 	protected static class AuthorizationServerConfiguration extends AuthorizationServerConfigurerAdapter {
+		
+		@Bean
+		public ClientDetailsService customClientDetailsService() {
+			return new CustomClientDetailsService();
+		}
 		@Override
 		public void configure(AuthorizationServerEndpointsConfigurer endpoints) throws Exception {
 			endpoints
@@ -154,12 +185,7 @@ class ClientResources {
 
 		@Override
 		public void configure(ClientDetailsServiceConfigurer clients) throws Exception {
-			clients
-					.inMemory()
-					.withClient("bg")
-					.secret("babyguardian")
-					.scopes("read","write")
-					.accessTokenValiditySeconds(2592000);
+			clients.withClientDetails(customClientDetailsService());
 		}
 	}
 

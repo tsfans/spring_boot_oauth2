@@ -4,7 +4,7 @@ security:
       client-id: bg
       client-secret: babyguardian
       scope: read,write
-      auto-approve-scopes: '.*'
+      auto-approve-scopes: .*
       access-token-validity-seconds: 2592000
 facebook:
   client:
@@ -28,3 +28,33 @@ github:
     userInfoUri: https://api.github.com/user
 logging:
   file: ./logs/spring_boot_oauth2.log
+spring:
+  datasource:
+    name: testoauth2
+    dirver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/testoauth2?useUnicode=true&characterEncoding=utf8&useSSL=false
+    username: root
+    password: 123456
+    druid:
+      initial-size: 10
+      max-active: 50
+      min-idle: 5
+      max-wait: 3000
+      pool-prepared-statements: true
+      max-pool-prepared-statement-per-connection-size: 20
+      validation-query: select 1
+      validation-query-timeout: 30000
+      test-on-borrow: false
+      test-on-return: false
+      test-while-idle: false
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      max-evictable-idle-time-millis: 600000
+      filters: stat,log4j,wall
+mybatis: 
+  mapper-locations: classpath:com/yinlu/application_manage_system/domain/mapping/*.xml
+  type-aliases-package: com.yinlu.application_manage_system.domain
+  configuration:
+    lazyLoadingEnabled: true
+    aggressiveLazyLoading: false
+    useGeneratedKeys: true
